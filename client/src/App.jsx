@@ -28,7 +28,7 @@ function App() {
 
   const fetchServices = async () => {
     try {
-      const response = await authenticatedFetch('http://localhost:3001/api/services');
+      const response = await authenticatedFetch('/services');
       const result = await response.json();
       if (result.message === 'success') {
         setServices(result.data);
