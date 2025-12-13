@@ -24,10 +24,10 @@ export default function Login() {
     }
 
     return (
-        <div className="card" style={{ maxWidth: '400px', margin: '4rem auto', textAlign: 'center' }}>
+        <div className="card" style={{ maxWidth: '400px', margin: '4rem auto' }}>
             <h1>Despachante Login</h1>
-            <form onSubmit={handleLogin} className="form-group" style={{ textAlign: 'left' }}>
-                <div style={{ marginBottom: '1rem' }}>
+            <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="form-group">
                     <label>Email</label>
                     <input
                         type="email"
@@ -35,10 +35,9 @@ export default function Login() {
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         required
-                        style={{ width: '100%', boxSizing: 'border-box' }}
                     />
                 </div>
-                <div style={{ marginBottom: '2rem' }}>
+                <div className="form-group">
                     <label>Senha</label>
                     <input
                         type="password"
@@ -46,10 +45,9 @@ export default function Login() {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         required
-                        style={{ width: '100%', boxSizing: 'border-box' }}
                     />
                 </div>
-                {error && <div style={{ color: '#ef4444', marginBottom: '1rem' }}>{error}</div>}
+                {error && <div style={{ color: 'var(--danger-color)', marginBottom: '1rem' }}>{error}</div>}
                 <button type="submit" className="submit-btn" disabled={loading}>
                     {loading ? 'Carregando...' : 'Entrar'}
                 </button>

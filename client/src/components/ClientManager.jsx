@@ -79,16 +79,21 @@ export default function ClientManager() {
         <div className="card">
             <h2>Gerenciar Clientes</h2>
 
-            <form onSubmit={handleSubmit} style={{ marginBottom: '2rem', display: 'flex', gap: '1rem' }}>
-                <input
-                    type="text"
-                    placeholder="Nome da Loja/Cliente"
-                    value={newClientName}
-                    onChange={(e) => setNewClientName(e.target.value)}
-                    required
-                    style={{ flex: 1, padding: '0.8rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '1rem' }}
-                />
-                <button type="submit" className="submit-btn" style={{ margin: 0, width: 'auto' }}>Adicionar</button>
+            {/* Changed from inline flex to form-grid structure for consistency, or keep specific flex row but stylized */}
+            <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', alignItems: 'flex-end' }}>
+                <div style={{ flex: 1 }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 500, fontSize: '0.9rem' }}>Nome da Loja/Cliente</label>
+                    <input
+                        type="text"
+                        placeholder="Nome da Loja/Cliente"
+                        value={newClientName}
+                        onChange={(e) => setNewClientName(e.target.value)}
+                        required
+                        style={{ width: '100%', boxSizing: 'border-box' }}
+                    // Input styles are global, but we ensure width 100%
+                    />
+                </div>
+                <button type="submit" className="btn-primary" style={{ height: 'fit-content', marginBottom: '2px' }}>Adicionar</button>
             </form>
 
             <h3>Clientes Cadastrados</h3>
@@ -104,7 +109,7 @@ export default function ClientManager() {
                     <tbody>
                         {clients.length === 0 ? (
                             <tr>
-                                <td colSpan="3" style={{ textAlign: 'center' }}>Nenhum cliente cadastrado.</td>
+                                <td colSpan="3" style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>Nenhum cliente cadastrado.</td>
                             </tr>
                         ) : (
                             clients.map((client) => (
@@ -114,14 +119,8 @@ export default function ClientManager() {
                                     <td>
                                         <button
                                             onClick={() => handleDeleteClick(client.id)}
-                                            style={{
-                                                backgroundColor: '#ef4444',
-                                                color: 'white',
-                                                border: 'none',
-                                                padding: '0.4rem 0.8rem',
-                                                borderRadius: '4px',
-                                                cursor: 'pointer'
-                                            }}
+                                            className="btn-danger"
+                                            style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
                                         >
                                             Apagar
                                         </button>
