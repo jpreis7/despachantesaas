@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import ServiceForm from './components/ServiceForm'
 import ServiceList from './components/ServiceList'
 import ClientManager from './components/ClientManager'
-import ConfirmationModal from './components/ConfirmationModal'
+
 import Login from './components/Login'
 import { supabase } from './supabaseClient'
 import { authenticatedFetch } from './api'
@@ -54,49 +54,26 @@ function App() {
 
   return (
     <div className="container">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-        <h1 style={{ margin: 0, fontSize: '2.5rem' }}>Despachante Manager</h1>
+      <div className="header-container">
+        <h1 className="app-title">Despachante Manager</h1>
         <button
           onClick={handleLogout}
-          style={{
-            padding: '0.6rem 1rem',
-            backgroundColor: 'transparent',
-            border: '1px solid #d1d5db',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            color: 'inherit'
-          }}
+          className="logout-btn"
         >
           Sair
         </button>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '2rem', gap: '1rem' }}>
+      <div className="nav-container">
         <button
           onClick={() => setView('services')}
-          style={{
-            backgroundColor: view === 'services' ? '#2563eb' : '#4b5563',
-            color: 'white',
-            padding: '0.8rem 2rem',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '1rem'
-          }}
+          className={`nav-btn ${view === 'services' ? 'active' : 'inactive'}`}
         >
           Serviços
         </button>
         <button
           onClick={() => setView('clients')}
-          style={{
-            backgroundColor: view === 'clients' ? '#2563eb' : '#4b5563',
-            color: 'white',
-            padding: '0.8rem 2rem',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '1rem'
-          }}
+          className={`nav-btn ${view === 'clients' ? 'active' : 'inactive'}`}
         >
           Clientes (Lojas)
         </button>
@@ -105,7 +82,7 @@ function App() {
       {view === 'services' ? (
         <>
           <ServiceForm onServiceAdded={fetchServices} />
-          <ServiceList services={services} />
+          <ServiceList services={services} onRefresh={fetchServices} />
         </>
       ) : (
         <ClientManager />
