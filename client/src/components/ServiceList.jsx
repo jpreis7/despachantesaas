@@ -156,7 +156,7 @@ export default function ServiceList({ services, onRefresh }) {
 
   return (
     <div className="card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="header-container" style={{ marginBottom: '1.5rem', borderBottom: 'none', paddingBottom: 0 }}>
         <h2 style={{ margin: 0 }}>Lista de Serviços</h2>
 
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -166,14 +166,13 @@ export default function ServiceList({ services, onRefresh }) {
               <button
                 key={filter}
                 onClick={() => setDateFilter(filter)}
+                className={dateFilter === filter ? 'btn-primary' : 'nav-btn'}
                 style={{
-                  backgroundColor: dateFilter === filter ? '#3b82f6' : '#e5e7eb',
-                  color: dateFilter === filter ? 'white' : '#374151',
-                  border: 'none',
                   padding: '0.4rem 0.8rem',
                   borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '0.9rem'
+                  fontSize: '0.9rem',
+                  backgroundColor: dateFilter === filter ? undefined : 'var(--border-color)',
+                  color: dateFilter === filter ? undefined : 'var(--text-secondary)'
                 }}
               >
                 {filter === 'all' ? 'Todos' : `${filter}d`}
@@ -183,18 +182,8 @@ export default function ServiceList({ services, onRefresh }) {
 
           <button
             onClick={handleExportExcel}
-            style={{
-              backgroundColor: '#10b981',
-              color: 'white',
-              border: 'none',
-              padding: '0.6rem 1.2rem',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontWeight: 500,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem'
-            }}
+            className="btn-success"
+            style={{ fontWeight: 500 }}
           >
             ⬇ Exportar Excel
           </button>
@@ -221,29 +210,23 @@ export default function ServiceList({ services, onRefresh }) {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: '0.5rem',
-        backgroundColor: '#f3f4f6',
-        borderRadius: '8px',
-        marginBottom: '1rem'
+        padding: '0.75rem 1rem',
+        backgroundColor: 'var(--background)',
+        borderRadius: 'var(--radius-md)',
+        marginBottom: '1.5rem',
+        border: '1px solid var(--border-color)'
       }}>
-        <div style={{ fontWeight: 'bold' }}>
-          Total: R$ {totalValue.toFixed(2)}
-          <span style={{ fontWeight: 'normal', marginLeft: '0.5rem', fontSize: '0.9rem' }}>
+        <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
+          Total: <span style={{ color: 'var(--success-color)' }}>R$ {totalValue.toFixed(2)}</span>
+          <span style={{ fontWeight: 'normal', marginLeft: '0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
             ({filteredServices.length} serviços)
           </span>
         </div>
         {selectedServices.size > 0 && (
           <button
             onClick={handleBulkDeleteClick}
-            style={{
-              backgroundColor: '#ef4444',
-              color: 'white',
-              border: 'none',
-              padding: '0.4rem 1rem',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontWeight: 'bold'
-            }}
+            className="btn-danger"
+            style={{ padding: '0.4rem 1rem' }}
           >
             Excluir Selecionados ({selectedServices.size})
           </button>
@@ -274,13 +257,13 @@ export default function ServiceList({ services, onRefresh }) {
           <tbody>
             {currentServices.length === 0 ? (
               <tr>
-                <td colSpan="9" style={{ textAlign: 'center' }}>
+                <td colSpan="9" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
                   {filterClient || dateFilter !== 'all' ? 'Nenhum serviço encontrado com os filtros atuais.' : 'Nenhum serviço cadastrado.'}
                 </td>
               </tr>
             ) : (
               currentServices.map((service) => (
-                <tr key={service.id} style={{ backgroundColor: selectedServices.has(service.id) ? '#eff6ff' : 'transparent' }}>
+                <tr key={service.id} style={{ backgroundColor: selectedServices.has(service.id) ? 'var(--primary-light)' : 'transparent' }}>
                   <td style={{ textAlign: 'center' }}>
                     <input
                       type="checkbox"
@@ -294,18 +277,12 @@ export default function ServiceList({ services, onRefresh }) {
                   <td>{service.model}</td>
                   <td>{service.owner}</td>
                   <td>{service.client}</td>
-                  <td>R$ {service.value.toFixed(2)}</td>
+                  <td style={{ fontWeight: '500' }}>R$ {service.value.toFixed(2)}</td>
                   <td>
                     <button
                       onClick={() => handleDeleteClick(service.id)}
-                      style={{
-                        backgroundColor: '#ef4444',
-                        color: 'white',
-                        border: 'none',
-                        padding: '0.4rem 0.8rem',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                      }}
+                      className="btn-danger"
+                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
                     >
                       Apagar
                     </button>
@@ -319,31 +296,33 @@ export default function ServiceList({ services, onRefresh }) {
 
       {/* Pagination Controls */}
       {totalPages > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem', gap: '1rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1.5rem', gap: '0.5rem', alignItems: 'center' }}>
           <button
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
+            className="nav-btn"
             style={{
-              padding: '0.5rem 1rem',
-              border: '1px solid #d1d5db',
               borderRadius: '4px',
-              backgroundColor: currentPage === 1 ? '#f3f4f6' : 'white',
+              backgroundColor: currentPage === 1 ? 'var(--background)' : 'white',
+              border: '1px solid var(--border-color)',
+              color: currentPage === 1 ? 'var(--text-secondary)' : 'var(--primary-color)',
               cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
             }}
           >
             Anterior
           </button>
-          <span>
+          <span style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', margin: '0 0.5rem' }}>
             Página {currentPage} de {totalPages}
           </span>
           <button
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
+            className="nav-btn"
             style={{
-              padding: '0.5rem 1rem',
-              border: '1px solid #d1d5db',
               borderRadius: '4px',
-              backgroundColor: currentPage === totalPages ? '#f3f4f6' : 'white',
+              backgroundColor: currentPage === totalPages ? 'var(--background)' : 'white',
+              border: '1px solid var(--border-color)',
+              color: currentPage === totalPages ? 'var(--text-secondary)' : 'var(--primary-color)',
               cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
             }}
           >
