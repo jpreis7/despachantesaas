@@ -14,20 +14,26 @@ export default function ServiceForm({ onServiceAdded }) {
     });
 
     const [clients, setClients] = useState([]);
+    const [dispatchers, setDispatchers] = useState([]);
 
     useEffect(() => {
-        const fetchClients = async () => {
+        const fetchData = async () => {
             try {
-                const response = await authenticatedFetch('/clients');
-                const result = await response.json();
-                if (result.message === 'success') {
-                    setClients(result.data);
-                }
+                const [clientsRes, dispatchersRes] = await Promise.all([
+                    authenticatedFetch('/clients'),
+                    authenticatedFetch('/dispatchers')
+                ]);
+
+                const clientsData = await clientsRes.json();
+                const dispatchersData = await dispatchersRes.json();
+
+                if (clientsData.message === 'success') setClients(clientsData.data);
+                if (dispatchersData.message === 'success') setDispatchers(dispatchersData.data);
             } catch (error) {
-                console.error('Error fetching clients:', error);
+                console.error('Error fetching data:', error);
             }
         };
-        fetchClients();
+        fetchData();
     }, []);
 
     const handleChange = (e) => {
@@ -112,7 +118,12 @@ export default function ServiceForm({ onServiceAdded }) {
 
                 <div className="form-group">
                     <label>Despachante</label>
-                    <input type="text" name="dispatcher" placeholder="Nome do Despachante" value={formData.dispatcher} onChange={handleChange} />
+                    <select name="dispatcher" value={formData.dispatcher} onChange={handleChange}>
+                        <option value="">Selecione um despachante...</option>
+                        {dispatchers.map(d => (
+                            <option key={d.id} value={d.name}>{d.name}</option>
+                        ))}
+                    </select>
                 </div>
 
                 <div className="form-group">

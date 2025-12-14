@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import ServiceForm from './components/ServiceForm'
 import ServiceList from './components/ServiceList'
 import ClientManager from './components/ClientManager'
+import DispatcherManager from './components/DispatcherManager'
 
 import Login from './components/Login'
 import { supabase } from './supabaseClient'
@@ -10,7 +11,7 @@ import { authenticatedFetch } from './api'
 function App() {
   const [session, setSession] = useState(null)
   const [services, setServices] = useState([]);
-  const [view, setView] = useState('services'); // 'services' or 'clients'
+  const [view, setView] = useState('services'); // 'services', 'clients', 'dispatchers'
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -77,6 +78,12 @@ function App() {
         >
           Clientes (Lojas)
         </button>
+        <button
+          onClick={() => setView('dispatchers')}
+          className={`nav-btn ${view === 'dispatchers' ? 'active' : 'inactive'}`}
+        >
+          Despachantes
+        </button>
       </div>
 
       {view === 'services' ? (
@@ -84,8 +91,10 @@ function App() {
           <ServiceForm onServiceAdded={fetchServices} />
           <ServiceList services={services} onRefresh={fetchServices} />
         </>
-      ) : (
+      ) : view === 'clients' ? (
         <ClientManager />
+      ) : (
+        <DispatcherManager />
       )}
     </div>
   );
