@@ -9,7 +9,8 @@ export default function ServiceForm({ onServiceAdded }) {
         plate: '',
         model: '',
         owner: '',
-        client: ''
+        client: '',
+        dispatcher: ''
     });
 
     const [clients, setClients] = useState([]);
@@ -62,7 +63,8 @@ export default function ServiceForm({ onServiceAdded }) {
                     plate: '',
                     model: '',
                     owner: '',
-                    client: ''
+                    client: '',
+                    dispatcher: ''
                 });
                 alert('Serviço adicionado com sucesso!');
             } else {
@@ -106,6 +108,11 @@ export default function ServiceForm({ onServiceAdded }) {
                 <div className="form-group">
                     <label>Proprietário</label>
                     <input type="text" name="owner" placeholder="Nome do Proprietário" required value={formData.owner} onChange={handleChange} />
+                </div>
+
+                <div className="form-group">
+                    <label>Despachante</label>
+                    <input type="text" name="dispatcher" placeholder="Nome do Despachante" value={formData.dispatcher} onChange={handleChange} />
                 </div>
 
                 <div className="form-group">

@@ -5,6 +5,9 @@ import { authenticatedFetch } from '../api';
 
 export default function ServiceList({ services, onRefresh }) {
   const [filterClient, setFilterClient] = useState('');
+  const [filterPlate, setFilterPlate] = useState('');
+  const [filterDispatcher, setFilterDispatcher] = useState('');
+  const [statusFilter, setStatusFilter] = useState('open'); // 'open', 'finished', 'all'
   const [dateFilter, setDateFilter] = useState('all'); // 'all', '7', '14', '30'
   const [clients, setClients] = useState([]);
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: null, isBulk: false });
@@ -27,15 +30,38 @@ export default function ServiceList({ services, onRefresh }) {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedServices(new Set());
-  }, [filterClient, dateFilter, services]);
+  }, [filterClient, filterPlate, filterDispatcher, statusFilter, dateFilter, services]);
 
   const filteredServices = useMemo(() => {
     let result = services;
 
+    // Filter by Client
     if (filterClient) {
       result = result.filter(service => service.client === filterClient);
     }
 
+    // Filter by Plate (Partial match, case insensitive)
+    if (filterPlate) {
+      const plateQuery = filterPlate.toLowerCase();
+      result = result.filter(service => service.plate && service.plate.toLowerCase().includes(plateQuery));
+    }
+
+    // Filter by Dispatcher (Partial match, case insensitive)
+    if (filterDispatcher) {
+      const dispatcherQuery = filterDispatcher.toLowerCase();
+      result = result.filter(service => service.dispatcher && service.dispatcher.toLowerCase().includes(dispatcherQuery));
+    }
+
+    // Filter by Status
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'open') {
+        result = result.filter(service => !service.completion_date);
+      } else if (statusFilter === 'finished') {
+        result = result.filter(service => service.completion_date);
+      }
+    }
+
+    // Filter by Date
     if (dateFilter !== 'all') {
       const now = new Date();
       // Reset time part to ensure correct day comparison if needed, 
@@ -55,7 +81,7 @@ export default function ServiceList({ services, onRefresh }) {
     }
 
     return result;
-  }, [services, filterClient, dateFilter]);
+  }, [services, filterClient, filterPlate, filterDispatcher, statusFilter, dateFilter]);
 
   const totalValue = useMemo(() => {
     return filteredServices.reduce((sum, service) => sum + service.value, 0);
@@ -127,6 +153,29 @@ export default function ServiceList({ services, onRefresh }) {
     }
   };
 
+  const handleQuickFinish = async (id) => {
+    try {
+      const completionDate = new Date().toISOString().split('T')[0]; // Current date YYYY-MM-DD
+      const response = await authenticatedFetch(`/services/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ completion_date: completionDate })
+      });
+
+      if (response.ok) {
+        if (onRefresh) onRefresh();
+      } else {
+        const res = await response.json();
+        alert(`Erro ao finalizar: ${res.error || 'Desconhecido'}`);
+      }
+    } catch (error) {
+      console.error("Error finishing service:", error);
+      alert("Erro de conexão ao finalizar serviço.");
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return '';
     const [year, month, day] = dateString.split('-');
@@ -136,9 +185,11 @@ export default function ServiceList({ services, onRefresh }) {
   const handleExportExcel = () => {
     const dataToExport = filteredServices.map(service => ({
       Data: formatDate(service.date),
+      Status: service.completion_date ? `Finalizado (${formatDate(service.completion_date)})` : 'Em Aberto',
       Tipo: service.type,
       Placa: service.plate,
       Modelo: service.model,
+      Despachante: service.dispatcher || '',
       Proprietário: service.owner,
       Cliente: service.client,
       Valor: service.value
@@ -148,18 +199,74 @@ export default function ServiceList({ services, onRefresh }) {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Serviços");
 
+    // Auto-width rough calculation
     const max_width = dataToExport.reduce((w, r) => Math.max(w, r.Tipo ? r.Tipo.length : 10), 10);
-    worksheet["!cols"] = [{ wch: 12 }, { wch: max_width }, { wch: 10 }, { wch: 15 }, { wch: 20 }, { wch: 15 }, { wch: 10 }];
+    // Config column widths (approximate chars)
+    worksheet["!cols"] = [
+      { wch: 12 }, // Data
+      { wch: 15 }, // Status
+      { wch: max_width }, // Tipo
+      { wch: 10 }, // Placa
+      { wch: 15 }, // Modelo
+      { wch: 15 }, // Despachante
+      { wch: 20 }, // Proprietário
+      { wch: 15 }, // Cliente
+      { wch: 10 }  // Valor
+    ];
 
-    XLSX.writeFile(workbook, `Servicos_${filterClient || 'Geral'}.xlsx`);
+    XLSX.writeFile(workbook, `Servicos_${statusFilter}.xlsx`);
   };
 
   return (
     <div className="card">
-      <div className="header-container" style={{ marginBottom: '1.5rem', borderBottom: 'none', paddingBottom: 0 }}>
+      <div className="header-container" style={{ marginBottom: '1.5rem', borderBottom: 'none', paddingBottom: 0, flexDirection: 'column', alignItems: 'flex-start', gap: '1rem' }}>
         <h2 style={{ margin: 0 }}>Lista de Serviços</h2>
 
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
+
+          {/* Status Filters */}
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              onClick={() => setStatusFilter('open')}
+              className={statusFilter === 'open' ? 'btn-danger' : 'nav-btn'}
+              style={{
+                padding: '0.4rem 0.8rem',
+                borderRadius: '4px',
+                fontSize: '0.9rem',
+                backgroundColor: statusFilter === 'open' ? undefined : 'var(--border-color)',
+                color: statusFilter === 'open' ? undefined : 'var(--text-secondary)'
+              }}
+            >
+              Em Aberto
+            </button>
+            <button
+              onClick={() => setStatusFilter('finished')}
+              className={statusFilter === 'finished' ? 'btn-success' : 'nav-btn'}
+              style={{
+                padding: '0.4rem 0.8rem',
+                borderRadius: '4px',
+                fontSize: '0.9rem',
+                backgroundColor: statusFilter === 'finished' ? undefined : 'var(--border-color)',
+                color: statusFilter === 'finished' ? undefined : 'var(--text-secondary)'
+              }}
+            >
+              Finalizados
+            </button>
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={statusFilter === 'all' ? 'btn-primary' : 'nav-btn'}
+              style={{
+                padding: '0.4rem 0.8rem',
+                borderRadius: '4px',
+                fontSize: '0.9rem',
+                backgroundColor: statusFilter === 'all' ? undefined : 'var(--border-color)',
+                color: statusFilter === 'all' ? undefined : 'var(--text-secondary)'
+              }}
+            >
+              Todos
+            </button>
+          </div>
+
           {/* Quick Date Filters */}
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             {['all', '7', '14', '30'].map(filter => (
@@ -187,15 +294,38 @@ export default function ServiceList({ services, onRefresh }) {
           >
             ⬇ Exportar Excel
           </button>
+        </div>
 
-          <div className="form-group" style={{ marginBottom: 0 }}>
+        {/* Text Filters Row */}
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', width: '100%' }}>
+          <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: '150px' }}>
+            <input
+              type="text"
+              placeholder="Filtrar por Placa..."
+              value={filterPlate}
+              onChange={(e) => setFilterPlate(e.target.value)}
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: '150px' }}>
+            <input
+              type="text"
+              placeholder="Filtrar por Despachante..."
+              value={filterDispatcher}
+              onChange={(e) => setFilterDispatcher(e.target.value)}
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: '200px' }}>
             <input
               list="clients-list"
               type="text"
-              placeholder="Pesquisar Cliente..."
+              placeholder="Pesquisar Loja/Cliente..."
               value={filterClient}
               onChange={(e) => setFilterClient(e.target.value)}
-              style={{ minWidth: '200px' }}
+              style={{ width: '100%' }}
             />
             <datalist id="clients-list">
               {clients.map(client => (
@@ -204,6 +334,7 @@ export default function ServiceList({ services, onRefresh }) {
             </datalist>
           </div>
         </div>
+
       </div>
 
       <div style={{
@@ -244,12 +375,14 @@ export default function ServiceList({ services, onRefresh }) {
                   checked={filteredServices.length > 0 && selectedServices.size === filteredServices.length}
                 />
               </th>
+              <th>Status</th>
               <th>Data</th>
               <th>Tipo</th>
               <th>Placa</th>
               <th>Modelo</th>
               <th>Proprietário</th>
               <th>Cliente</th>
+              <th>Despachante</th>
               <th>Valor</th>
               <th>Ações</th>
             </tr>
@@ -257,8 +390,8 @@ export default function ServiceList({ services, onRefresh }) {
           <tbody>
             {currentServices.length === 0 ? (
               <tr>
-                <td colSpan="9" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
-                  {filterClient || dateFilter !== 'all' ? 'Nenhum serviço encontrado com os filtros atuais.' : 'Nenhum serviço cadastrado.'}
+                <td colSpan="11" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
+                  {filterClient || filterPlate || filterDispatcher || dateFilter !== 'all' ? 'Nenhum serviço encontrado com os filtros atuais.' : 'Nenhum serviço cadastrado.'}
                 </td>
               </tr>
             ) : (
@@ -271,21 +404,44 @@ export default function ServiceList({ services, onRefresh }) {
                       onChange={() => handleSelectService(service.id)}
                     />
                   </td>
+                  <td>
+                    {service.completion_date ? (
+                      <span style={{ color: 'var(--success-color)', fontSize: '0.85rem', fontWeight: 500 }}>
+                        ✓ Finalizado<br />
+                        <small style={{ color: 'var(--text-secondary)' }}>{formatDate(service.completion_date)}</small>
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--warning-color)', fontSize: '0.85rem', fontWeight: 500 }}>Em Aberto</span>
+                    )}
+                  </td>
                   <td>{formatDate(service.date)}</td>
                   <td>{service.type}</td>
                   <td>{service.plate}</td>
                   <td>{service.model}</td>
                   <td>{service.owner}</td>
                   <td>{service.client}</td>
+                  <td>{service.dispatcher || '-'}</td>
                   <td style={{ fontWeight: '500' }}>R$ {service.value.toFixed(2)}</td>
                   <td>
-                    <button
-                      onClick={() => handleDeleteClick(service.id)}
-                      className="btn-danger"
-                      style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
-                    >
-                      Apagar
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      {!service.completion_date && (
+                        <button
+                          onClick={() => handleQuickFinish(service.id)}
+                          className="btn-success"
+                          title="Marcar como Finalizado"
+                          style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem' }}
+                        >
+                          ✓
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDeleteClick(service.id)}
+                        className="btn-danger"
+                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                      >
+                        Apagar
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))

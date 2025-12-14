@@ -73,7 +73,7 @@ app.get('/api/services', async (req, res) => {
 
 // POST /api/services - Create a new service
 app.post('/api/services', async (req, res) => {
-    const { date, type, value, plate, model, owner, client } = req.body;
+    const { date, type, value, plate, model, owner, client, dispatcher } = req.body;
 
     // Basic validation
     if (!date || !type || !value || !plate || !model || !owner || !client) {
@@ -88,7 +88,7 @@ app.post('/api/services', async (req, res) => {
 
     const { data, error } = await supabase
         .from('services')
-        .insert([{ date, type, value, plate, model, owner, client }])
+        .insert([{ date, type, value, plate, model, owner, client, dispatcher }])
         .select();
 
     if (error) {
@@ -100,6 +100,31 @@ app.post('/api/services', async (req, res) => {
         "message": "success",
         "data": data[0],
         "id": data[0].id
+    });
+});
+
+// PUT /api/services/:id - Update a service
+app.put('/api/services/:id', async (req, res) => {
+    const { id } = req.params;
+    const updates = req.body;
+
+    // Prevent updating ID
+    delete updates.id;
+
+    const { data, error } = await supabase
+        .from('services')
+        .update(updates)
+        .eq('id', id)
+        .select();
+
+    if (error) {
+        res.status(400).json({ "error": error.message });
+        return;
+    }
+
+    res.json({
+        "message": "success",
+        "data": data[0]
     });
 });
 
