@@ -18,20 +18,21 @@ export default function ServiceForm({ onServiceAdded }) {
 
     useEffect(() => {
         const fetchData = async () => {
-            try {
-                const [clientsRes, dispatchersRes] = await Promise.all([
-                    authenticatedFetch('/clients'),
-                    authenticatedFetch('/dispatchers')
-                ]);
+            // Fetch Clients
+            authenticatedFetch('/clients')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.message === 'success') setClients(data.data);
+                })
+                .catch(err => console.error('Error fetching clients:', err));
 
-                const clientsData = await clientsRes.json();
-                const dispatchersData = await dispatchersRes.json();
-
-                if (clientsData.message === 'success') setClients(clientsData.data);
-                if (dispatchersData.message === 'success') setDispatchers(dispatchersData.data);
-            } catch (error) {
-                console.error('Error fetching data:', error);
-            }
+            // Fetch Dispatchers
+            authenticatedFetch('/dispatchers')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.message === 'success') setDispatchers(data.data);
+                })
+                .catch(err => console.error('Error fetching dispatchers:', err));
         };
         fetchData();
     }, []);
