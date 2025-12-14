@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import ConfirmationModal from './ConfirmationModal';
+import DateSelectionModal from './DateSelectionModal';
 import { authenticatedFetch } from '../api';
 
 export default function ServiceList({ services, onRefresh }) {
@@ -11,6 +12,7 @@ export default function ServiceList({ services, onRefresh }) {
   const [dateFilter, setDateFilter] = useState('all'); // 'all', '7', '14', '30'
   const [clients, setClients] = useState([]);
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: null, isBulk: false });
+  const [finishModal, setFinishModal] = useState({ isOpen: false, id: null });
   const [selectedServices, setSelectedServices] = useState(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 50;
@@ -153,15 +155,20 @@ export default function ServiceList({ services, onRefresh }) {
     }
   };
 
-  const handleQuickFinish = async (id) => {
+  const handleQuickFinishClick = (id) => {
+    setFinishModal({ isOpen: true, id });
+  };
+
+  const handleConfirmFinish = async (selectedDate) => {
     try {
-      const completionDate = new Date().toISOString().split('T')[0]; // Current date YYYY-MM-DD
-      const response = await authenticatedFetch(`/services/${id}`, {
+      if (!finishModal.id) return;
+
+      const response = await authenticatedFetch(`/services/${finishModal.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ completion_date: completionDate })
+        body: JSON.stringify({ completion_date: selectedDate })
       });
 
       if (response.ok) {
@@ -173,19 +180,23 @@ export default function ServiceList({ services, onRefresh }) {
     } catch (error) {
       console.error("Error finishing service:", error);
       alert("Erro de conexão ao finalizar serviço.");
+    } finally {
+      setFinishModal({ isOpen: false, id: null });
     }
   };
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString, label = '') => {
     if (!dateString) return '';
     const [year, month, day] = dateString.split('-');
-    return `${day}/${month}/${year}`;
+    const formatted = `${day}/${month}/${year}`;
+    return label ? `${label}: ${formatted}` : formatted;
   };
 
   const handleExportExcel = () => {
     const dataToExport = filteredServices.map(service => ({
-      Data: formatDate(service.date),
-      Status: service.completion_date ? `Finalizado (${formatDate(service.completion_date)})` : 'Em Aberto',
+      Data_Entrada: formatDate(service.date),
+      Data_Fim: service.completion_date ? formatDate(service.completion_date) : '',
+      Status: service.completion_date ? 'Finalizado' : 'Em Aberto',
       Tipo: service.type,
       Placa: service.plate,
       Modelo: service.model,
@@ -203,8 +214,9 @@ export default function ServiceList({ services, onRefresh }) {
     const max_width = dataToExport.reduce((w, r) => Math.max(w, r.Tipo ? r.Tipo.length : 10), 10);
     // Config column widths (approximate chars)
     worksheet["!cols"] = [
-      { wch: 12 }, // Data
-      { wch: 15 }, // Status
+      { wch: 12 }, // Data Entrada
+      { wch: 12 }, // Data Fim
+      { wch: 12 }, // Status
       { wch: max_width }, // Tipo
       { wch: 10 }, // Placa
       { wch: 15 }, // Modelo
@@ -376,7 +388,7 @@ export default function ServiceList({ services, onRefresh }) {
                 />
               </th>
               <th>Status</th>
-              <th>Data</th>
+              <th>Datas</th>
               <th>Tipo</th>
               <th>Placa</th>
               <th>Modelo</th>
@@ -407,14 +419,22 @@ export default function ServiceList({ services, onRefresh }) {
                   <td>
                     {service.completion_date ? (
                       <span style={{ color: 'var(--success-color)', fontSize: '0.85rem', fontWeight: 500 }}>
-                        ✓ Finalizado<br />
-                        <small style={{ color: 'var(--text-secondary)' }}>{formatDate(service.completion_date)}</small>
+                        ✓ Finalizado
                       </span>
                     ) : (
                       <span style={{ color: 'var(--warning-color)', fontSize: '0.85rem', fontWeight: 500 }}>Em Aberto</span>
                     )}
                   </td>
-                  <td>{formatDate(service.date)}</td>
+                  <td>
+                    <div style={{ display: 'flex', flexDirection: 'column', fontSize: '0.8rem' }}>
+                      <span>{formatDate(service.date, 'Entrada')}</span>
+                      {service.completion_date && (
+                        <span style={{ color: 'var(--success-color)', fontWeight: 500 }}>
+                          {formatDate(service.completion_date, 'Fim')}
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td>{service.type}</td>
                   <td>{service.plate}</td>
                   <td>{service.model}</td>
@@ -426,7 +446,7 @@ export default function ServiceList({ services, onRefresh }) {
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                       {!service.completion_date && (
                         <button
-                          onClick={() => handleQuickFinish(service.id)}
+                          onClick={() => handleQuickFinishClick(service.id)}
                           className="btn-success"
                           title="Marcar como Finalizado"
                           style={{ padding: '0.4rem 0.6rem', fontSize: '0.8rem' }}
@@ -496,6 +516,14 @@ export default function ServiceList({ services, onRefresh }) {
           ? `Tem certeza que deseja apagar ${selectedServices.size} serviços selecionados? Esta ação não pode ser desfeita.`
           : "Tem certeza que deseja apagar este serviço? Esta ação não pode ser desfeita."
         }
+      />
+
+      <DateSelectionModal
+        isOpen={finishModal.isOpen}
+        onClose={() => setFinishModal({ isOpen: false, id: null })}
+        onConfirm={handleConfirmFinish}
+        title="Finalizar Serviço"
+        message="Selecione a data de conclusão deste serviço:"
       />
     </div>
   );
