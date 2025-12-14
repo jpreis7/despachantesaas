@@ -21,7 +21,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 app.use(cors({
     origin: ['http://localhost:5173', 'https://gerenciador-despachante-client.vercel.app'],
-    methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(bodyParser.json());
