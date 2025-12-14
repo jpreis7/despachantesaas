@@ -10,6 +10,8 @@ export default function ServiceList({ services, onRefresh }) {
   const [filterDispatcher, setFilterDispatcher] = useState('');
   const [statusFilter, setStatusFilter] = useState('open'); // 'open', 'finished', 'all'
   const [dateFilter, setDateFilter] = useState('all'); // 'all', '7', '14', '30'
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [clients, setClients] = useState([]);
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: null, isBulk: false });
   const [finishModal, setFinishModal] = useState({ isOpen: false, id: null });
@@ -32,7 +34,7 @@ export default function ServiceList({ services, onRefresh }) {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedServices(new Set());
-  }, [filterClient, filterPlate, filterDispatcher, statusFilter, dateFilter, services]);
+  }, [filterClient, filterPlate, filterDispatcher, statusFilter, dateFilter, startDate, endDate, services]);
 
   const filteredServices = useMemo(() => {
     let result = services;
@@ -63,7 +65,39 @@ export default function ServiceList({ services, onRefresh }) {
       }
     }
 
-    // Filter by Date
+    // Filter by Custom Date Range
+    if (startDate || endDate) {
+      result = result.filter(service => {
+        if (!service.date) return false;
+        const [year, month, day] = service.date.split('-').map(Number);
+        // Create date at start of day
+        const serviceDate = new Date(year, month - 1, day);
+        serviceDate.setHours(0, 0, 0, 0);
+
+        if (startDate) {
+          const [sYear, sMonth, sDay] = startDate.split('-').map(Number);
+          const start = new Date(sYear, sMonth - 1, sDay);
+          start.setHours(0, 0, 0, 0);
+          if (serviceDate < start) return false;
+        }
+
+        if (endDate) {
+          const [eYear, eMonth, eDay] = endDate.split('-').map(Number);
+          const end = new Date(eYear, eMonth - 1, eDay);
+          end.setHours(0, 0, 0, 0);
+          if (serviceDate > end) return false;
+        }
+
+        return true;
+      });
+    }
+
+    // Filter by Date (Preset) - Only if custom range is not active or complimentary?
+    // Let's assume custom range overrides or works in AND relation if both present.
+    // If user sets specific dates, usually they want THAT range.
+    // But keeping existing logic for presets if dates are not manually set might be cleaner,
+    // or just let them stack (AND logic).
+    // Given the UI separation, let's treat them as separate filters that AND together.
     if (dateFilter !== 'all') {
       const now = new Date();
       // Reset time part to ensure correct day comparison if needed, 
@@ -73,9 +107,6 @@ export default function ServiceList({ services, onRefresh }) {
 
       result = result.filter(service => {
         if (!service.date) return false;
-        // service.date is YYYY-MM-DD. 
-        // Create date object at 00:00:00 local time (parsing YYYY-MM-DD roughly works)
-        // Better: ensure YYYY-MM-DD is treated correctly. 
         const [year, month, day] = service.date.split('-').map(Number);
         const serviceDate = new Date(year, month - 1, day);
         return serviceDate >= thresholdDate;
@@ -83,7 +114,7 @@ export default function ServiceList({ services, onRefresh }) {
     }
 
     return result;
-  }, [services, filterClient, filterPlate, filterDispatcher, statusFilter, dateFilter]);
+  }, [services, filterClient, filterPlate, filterDispatcher, statusFilter, dateFilter, startDate, endDate]);
 
   const totalValue = useMemo(() => {
     return filteredServices.reduce((sum, service) => sum + service.value, 0);
@@ -345,6 +376,37 @@ export default function ServiceList({ services, onRefresh }) {
               ))}
             </datalist>
           </div>
+        </div>
+
+        {/* Date Range Filters Row */}
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', width: '100%', marginTop: '0.5rem' }}>
+          <div className="form-group" style={{ marginBottom: 0, width: '150px' }}>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.2rem', display: 'block' }}>Data Inicial</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              style={{ width: '100%', padding: '0.4rem' }}
+            />
+          </div>
+          <div className="form-group" style={{ marginBottom: 0, width: '150px' }}>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.2rem', display: 'block' }}>Data Final</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              style={{ width: '100%', padding: '0.4rem' }}
+            />
+          </div>
+          {(startDate || endDate) && (
+            <button
+              onClick={() => { setStartDate(''); setEndDate(''); }}
+              className="nav-btn"
+              style={{ alignSelf: 'flex-end', height: '35px', padding: '0 1rem' }}
+            >
+              Limpar Datas
+            </button>
+          )}
         </div>
 
       </div>
