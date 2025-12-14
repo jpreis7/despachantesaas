@@ -200,6 +200,64 @@ app.delete('/api/clients/:id', async (req, res) => {
     res.json({ "message": "deleted" });
 });
 
+// GET /api/dispatchers - Retrieve all dispatchers
+app.get('/api/dispatchers', async (req, res) => {
+    const { data, error } = await supabase
+        .from('dispatchers')
+        .select('*')
+        .order('name', { ascending: true });
+
+    if (error) {
+        res.status(400).json({ "error": error.message });
+        return;
+    }
+
+    res.json({
+        "message": "success",
+        "data": data
+    });
+});
+
+// POST /api/dispatchers - Create a new dispatcher
+app.post('/api/dispatchers', async (req, res) => {
+    const { name } = req.body;
+
+    if (!name) {
+        res.status(400).json({ "error": "Missing name" });
+        return;
+    }
+
+    const { data, error } = await supabase
+        .from('dispatchers')
+        .insert([{ name }])
+        .select();
+
+    if (error) {
+        res.status(400).json({ "error": error.message });
+        return;
+    }
+
+    res.json({
+        "message": "success",
+        "data": data[0],
+        "id": data[0].id
+    });
+});
+
+// DELETE /api/dispatchers/:id - Delete a dispatcher
+app.delete('/api/dispatchers/:id', async (req, res) => {
+    const { error } = await supabase
+        .from('dispatchers')
+        .delete()
+        .eq('id', req.params.id);
+
+    if (error) {
+        res.status(400).json({ "error": error.message });
+        return;
+    }
+    res.json({ "message": "deleted" });
+});
+
 // Local development
 if (process.env.NODE_ENV !== 'production') {
     app.listen(PORT, () => {
