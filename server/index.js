@@ -9,15 +9,17 @@ const PORT = 3001;
 
 // Initialize Supabase Client
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // Keep for admin tasks if needed, but primary use will be scoped
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-    console.error('Missing Supabase URL or Key in .env');
+if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('Missing Supabase URL or Anon Key in .env');
     // We don't exit here to allow the user to add the file and restart, 
     // but operations will fail.
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+// Global admin client (use sparingly)
+const adminSupabase = createClient(supabaseUrl, supabaseKey);
 
 app.use(cors({
     origin: ['http://localhost:5173', 'https://gerenciador-despachante-client.vercel.app'],
@@ -38,13 +40,22 @@ const requireAuth = async (req, res, next) => {
         return res.status(401).json({ error: 'Missing token' });
     }
 
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    // Create a scoped client for this user
+    // This connects to Supabase AS the user, respecting RLS policies
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: {
+            headers: { Authorization: `Bearer ${token}` },
+        },
+    });
+
+    const { data: { user }, error } = await supabase.auth.getUser();
 
     if (error || !user) {
         return res.status(401).json({ error: 'Invalid or expired token' });
     }
 
     req.user = user;
+    req.supabase = supabase; // Attach scoped client to request
     next();
 };
 
@@ -52,10 +63,11 @@ const requireAuth = async (req, res, next) => {
 app.use('/api', requireAuth);
 
 // Routes
+// NOTE: We now use `req.supabase` instead of the global `adminSupabase`
 
 // GET /api/services - Retrieve all services
 app.get('/api/services', async (req, res) => {
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
         .from('services')
         .select('*')
         .order('date', { ascending: false })
@@ -86,7 +98,8 @@ app.post('/api/services', async (req, res) => {
         return;
     }
 
-    const { data, error } = await supabase
+    // dispatcher is optional
+    const { data, error } = await req.supabase
         .from('services')
         .insert([{ date, type, value, plate, model, owner, client, dispatcher }])
         .select();
@@ -111,7 +124,7 @@ app.put('/api/services/:id', async (req, res) => {
     // Prevent updating ID
     delete updates.id;
 
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
         .from('services')
         .update(updates)
         .eq('id', id)
@@ -130,7 +143,7 @@ app.put('/api/services/:id', async (req, res) => {
 
 // GET /api/clients - Retrieve all clients
 app.get('/api/clients', async (req, res) => {
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
         .from('clients')
         .select('*')
         .order('name', { ascending: true });
@@ -155,7 +168,7 @@ app.post('/api/clients', async (req, res) => {
         return;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
         .from('clients')
         .insert([{ name }])
         .select();
@@ -174,7 +187,7 @@ app.post('/api/clients', async (req, res) => {
 
 // DELETE /api/services/:id - Delete a service
 app.delete('/api/services/:id', async (req, res) => {
-    const { error } = await supabase
+    const { error } = await req.supabase
         .from('services')
         .delete()
         .eq('id', req.params.id);
@@ -188,7 +201,7 @@ app.delete('/api/services/:id', async (req, res) => {
 
 // DELETE /api/clients/:id - Delete a client
 app.delete('/api/clients/:id', async (req, res) => {
-    const { error } = await supabase
+    const { error } = await req.supabase
         .from('clients')
         .delete()
         .eq('id', req.params.id);
@@ -202,7 +215,7 @@ app.delete('/api/clients/:id', async (req, res) => {
 
 // GET /api/dispatchers - Retrieve all dispatchers
 app.get('/api/dispatchers', async (req, res) => {
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
         .from('dispatchers')
         .select('*')
         .order('name', { ascending: true });
@@ -227,7 +240,7 @@ app.post('/api/dispatchers', async (req, res) => {
         return;
     }
 
-    const { data, error } = await supabase
+    const { data, error } = await req.supabase
         .from('dispatchers')
         .insert([{ name }])
         .select();
@@ -246,7 +259,7 @@ app.post('/api/dispatchers', async (req, res) => {
 
 // DELETE /api/dispatchers/:id - Delete a dispatcher
 app.delete('/api/dispatchers/:id', async (req, res) => {
-    const { error } = await supabase
+    const { error } = await req.supabase
         .from('dispatchers')
         .delete()
         .eq('id', req.params.id);
