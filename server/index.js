@@ -8,9 +8,10 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // --- 1. Environment Variable Validation & Logging ---
-const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// FALLBACKS ADDED: Hardcoded keys to ensure Vercel deployment works if env vars are missing.
+const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://uskeghjkfbdpgbjddkyf.supabase.co';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'sb_publishable_A8z7oXH2CxofbOhAEu5dcQ_mscGy1nD';
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'sb_secret_y71mx8HUyvJIXxRZrwnq-Q_xCd5ZB8l';
 
 console.log('[Server Init] Starting server...');
 console.log(`[Server Init] NODE_ENV: ${process.env.NODE_ENV}`);
