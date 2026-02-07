@@ -129,24 +129,46 @@ app.use('/api', requireAuth);
 app.get('/api/services', async (req, res) => {
     try {
         console.log(`[GET /api/services] Fetching for User ID: ${req.user.id}`);
-        // Log the user ID to ensure RLS context is correct
 
-        const { data, error } = await req.supabase
-            .from('services')
-            .select('*')
-            .order('date', { ascending: false })
-            .order('id', { ascending: false })
-            .range(0, 9999);
+        let allServices = [];
+        let page = 0;
+        const pageSize = 1000;
+        let hasMore = true;
 
-        if (error) {
-            console.error('[GET /api/services] DB Error:', error);
-            return res.status(400).json({ "error": error.message });
+        while (hasMore) {
+            const start = page * pageSize;
+            const end = start + pageSize - 1;
+
+            console.log(`[GET /api/services] Fetching range ${start}-${end}...`);
+
+            const { data, error } = await req.supabase
+                .from('services')
+                .select('*')
+                .order('date', { ascending: false })
+                .order('id', { ascending: false })
+                .range(start, end);
+
+            if (error) {
+                console.error('[GET /api/services] DB Error:', error);
+                throw error;
+            }
+
+            if (data && data.length > 0) {
+                allServices = allServices.concat(data);
+                if (data.length < pageSize) {
+                    hasMore = false; // Less than pageSize means we reached the end
+                } else {
+                    page++;
+                }
+            } else {
+                hasMore = false;
+            }
         }
 
-        console.log(`[GET /api/services] Success. Count: ${data ? data.length : 0}`);
+        console.log(`[GET /api/services] Success. Total Count: ${allServices.length}`);
         res.json({
             "message": "success",
-            "data": data
+            "data": allServices
         });
     } catch (err) {
         console.error('[GET /api/services] Server Error:', err);
