@@ -25,10 +25,28 @@ export default function ImportServices() {
         reader.onload = (e) => {
             try {
                 const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
+                // Codepage 1252 helps with some ANSI encoded CSVs common in Brazil/Excel
+                const workbook = XLSX.read(data, { type: 'array', codepage: 1252 });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
                 const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                if (jsonData.length === 0) {
+                    setMessage({ type: 'error', text: 'Nenhum dado encontrado no arquivo.' });
+                    setPreviewData([]);
+                    return;
+                }
+
+                // Check if semicolon separation failed (all keys in one string)
+                const firstKey = Object.keys(jsonData[0])[0];
+                if (Object.keys(jsonData[0]).length === 1 && firstKey.includes(';')) {
+                    setMessage({ type: 'warning', text: 'Detectado possível problema com separador (ponto e vírgula). Tentando processar, mas verifique a pré-visualização.' });
+                    // NOTE: Implementing manual CSV parsing here would be ideal if XLSX fails hard, 
+                    // but usually XLSX handles it if extension is .csv. 
+                    // If the user uploads a file where XLSX fails to split columns, we might need a different approach.
+                    // For now, let's proceed and see if preview reveals the issue to the user.
+                }
+
                 setPreviewData(jsonData);
                 setMessage(null);
             } catch (error) {
@@ -48,37 +66,56 @@ export default function ImportServices() {
     };
 
     const processData = (row) => {
-        // Mapping basic fields based on expected headers
-        // Flexible matching for headers
+        // Helper to find value by extensive list of potential keys (case insensitive, trimmed)
         const getField = (keys) => {
-            const key = Object.keys(row).find(k => keys.includes(k.trim().toLowerCase()));
-            return key ? row[key] : null;
+            const foundKey = Object.keys(row).find(k =>
+                keys.some(searchKey => k.trim().toLowerCase() === searchKey)
+            );
+            return foundKey ? row[foundKey] : null;
         };
 
-        const dateRaw = getField(['data', 'date']);
-        let date = new Date().toISOString().split('T')[0];
+        const parseDate = (raw) => {
+            if (!raw) return null;
+            let dateStr = null;
 
-        // Simple date parsing attempt (assuming DD/MM/YYYY or YYYY-MM-DD or Excel serial)
-        if (dateRaw) {
-            if (typeof dateRaw === 'number') {
-                // Excel serial date
-                const dateObj = new Date(Math.round((dateRaw - 25569) * 86400 * 1000));
-                date = dateObj.toISOString().split('T')[0];
-            } else if (typeof dateRaw === 'string') {
-                if (dateRaw.includes('/')) {
-                    const parts = dateRaw.split('/');
-                    if (parts.length === 3) {
-                        // Assume DD/MM/YYYY
-                        date = `${parts[2]}-${parts[1]}-${parts[0]}`;
-                    }
-                } else {
-                    date = dateRaw; // Assume ISO
+            // Excel Serial Date
+            if (typeof raw === 'number') {
+                const dateObj = new Date(Math.round((raw - 25569) * 86400 * 1000));
+                return dateObj.toISOString().split('T')[0];
+            }
+
+            if (typeof raw === 'string') {
+                const cleanRaw = raw.trim();
+                // DD/MM/YYYY or DD-MM-YYYY
+                if (/^\d{1,2}[\/-]\d{1,2}[\/-]\d{4}/.test(cleanRaw)) {
+                    const parts = cleanRaw.split(/[\/-]/);
+                    // standard: day/month/year
+                    return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                }
+                // YYYY-MM-DD
+                if (/^\d{4}-\d{2}-\d{2}/.test(cleanRaw)) {
+                    return cleanRaw.substring(0, 10);
                 }
             }
-        }
+            return dateStr;
+        };
+
+        // Priority Mapping
+
+        // 1. Date (Data_Entrada > Data > Date)
+        const dateRaw = getField(['data_entrada', 'data entrada']) || getField(['data', 'date']);
+        // Only use current date if NO date found. 
+        // If date found is invalid, we might want to default to today or keep null? 
+        // Logic: parseDate returns null if invalid/missing. || fallback.
+        const date = parseDate(dateRaw) || new Date().toISOString().split('T')[0];
+
+        // 2. Completion Date (Data_Fim > Data Saida > Completion Date)
+        const completionRaw = getField(['data_fim', 'data fim', 'data_saida', 'completion_date']);
+        const completionDate = parseDate(completionRaw);
 
         return {
             date: date,
+            completion_date: completionDate, // Supabase handles null correctly
             type: getField(['tipo', 'type', 'serviço', 'service']) || 'Outros',
             value: parseFloat(getField(['valor', 'value', 'preço', 'price'])) || 0,
             plate: getField(['placa', 'plate']) || '',
@@ -86,7 +123,6 @@ export default function ImportServices() {
             owner: getField(['proprietário', 'owner', 'cliente final']) || '',
             client: getField(['cliente', 'client', 'loja', 'store']) || '',
             dispatcher: getField(['despachante', 'dispatcher']) || '',
-            // user_id is handled by Supabase default or RLS, but we can relies on Authenticated Client
         };
     };
 
@@ -101,13 +137,9 @@ export default function ImportServices() {
 
         setProgress({ current: 0, total, success: 0, errors: 0 });
 
-        // Batch insert could be faster, but let's do one by one or small batches for better error handling/progress per row if needed.
-        // For simplicity and RLS safety, let's try a bulk insert first, or small chunks.
-        // Existing ID generation relies on DB.
-
         const formattedData = previewData.map(processData);
 
-        // Chunking to avoid payload too large
+        // Chunking
         const chunkSize = 50;
         for (let i = 0; i < formattedData.length; i += chunkSize) {
             const chunk = formattedData.slice(i, i + chunkSize);
@@ -146,8 +178,8 @@ export default function ImportServices() {
         <div className="card">
             <h2>Importar Serviços (CSV/Excel)</h2>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>
-                Selecione uma planilha para importar. Certifique-se que ela contenha colunas como:
-                <strong> Data, Tipo, Valor, Placa, Modelo, Proprietário, Cliente, Despachante</strong>.
+                Selecione uma planilha para importar. A planilha pode conter colunas como:
+                <strong> Data_Entrada, Data_Fim, Tipo, Valor, Placa, Modelo, Proprietário, Cliente, Despachante</strong>.
             </p>
 
             <div className="form-group">
