@@ -11,6 +11,7 @@ export default function ServiceList({ services, onRefresh }) {
   const [statusFilter, setStatusFilter] = useState('open'); // 'open', 'finished', 'all'
   const [dateFilter, setDateFilter] = useState('all'); // 'all', '7', '14', '30'
   const [specificDate, setSpecificDate] = useState('');
+  const [monthFilter, setMonthFilter] = useState(''); // YYYY-MM
   const [clients, setClients] = useState([]);
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: null, isBulk: false });
   const [finishModal, setFinishModal] = useState({ isOpen: false, id: null });
@@ -33,7 +34,7 @@ export default function ServiceList({ services, onRefresh }) {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedServices(new Set());
-  }, [filterClient, filterPlate, filterDispatcher, statusFilter, dateFilter, specificDate, services]);
+  }, [filterClient, filterPlate, filterDispatcher, statusFilter, dateFilter, specificDate, monthFilter, services]);
 
   const filteredServices = useMemo(() => {
     let result = services;
@@ -68,7 +69,11 @@ export default function ServiceList({ services, onRefresh }) {
     if (specificDate) {
       result = result.filter(service => service.date === specificDate);
     }
-    // Filter by Date (Preset) - Only if specific date is NOT set
+    // Filter by Month (YYYY-MM)
+    else if (monthFilter) {
+      result = result.filter(service => service.date && service.date.startsWith(monthFilter));
+    }
+    // Filter by Date (Preset) - Only if specific date/month is NOT set
     else if (dateFilter !== 'all') {
       const now = new Date();
       // Reset time part to ensure correct day comparison if needed, 
@@ -85,7 +90,7 @@ export default function ServiceList({ services, onRefresh }) {
     }
 
     return result;
-  }, [services, filterClient, filterPlate, filterDispatcher, statusFilter, dateFilter, specificDate]);
+  }, [services, filterClient, filterPlate, filterDispatcher, statusFilter, dateFilter, specificDate, monthFilter]);
 
   const totalValue = useMemo(() => {
     return filteredServices.reduce((sum, service) => sum + service.value, 0);
@@ -288,7 +293,8 @@ export default function ServiceList({ services, onRefresh }) {
                 key={filter}
                 onClick={() => {
                   setDateFilter(filter);
-                  setSpecificDate(''); // Clear specific date when using preset
+                  setSpecificDate('');
+                  setMonthFilter('');
                 }}
                 className={dateFilter === filter ? 'btn-primary' : 'nav-btn'}
                 style={{
@@ -354,25 +360,51 @@ export default function ServiceList({ services, onRefresh }) {
 
         {/* Date Filter Row */}
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', width: '100%', marginTop: '0.5rem' }}>
+
+          {/* Month Filter */}
           <div className="form-group" style={{ marginBottom: 0, width: '200px' }}>
-            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.2rem', display: 'block' }}>Filtrar por Data</label>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.2rem', display: 'block' }}>Mês de Referência</label>
+            <input
+              type="month"
+              value={monthFilter}
+              onChange={(e) => {
+                setMonthFilter(e.target.value);
+                if (e.target.value) {
+                  setSpecificDate('');
+                  setDateFilter('all');
+                }
+              }}
+              style={{ width: '100%', padding: '0.4rem' }}
+            />
+          </div>
+
+          {/* Specific Date Filter */}
+          <div className="form-group" style={{ marginBottom: 0, width: '200px' }}>
+            <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.2rem', display: 'block' }}>Data Específica</label>
             <input
               type="date"
               value={specificDate}
               onChange={(e) => {
                 setSpecificDate(e.target.value);
-                if (e.target.value) setDateFilter('all'); // Clear preset if specific date is chosen
+                if (e.target.value) {
+                  setMonthFilter('');
+                  setDateFilter('all');
+                }
               }}
               style={{ width: '100%', padding: '0.4rem' }}
             />
           </div>
-          {specificDate && (
+
+          {(specificDate || monthFilter) && (
             <button
-              onClick={() => setSpecificDate('')}
+              onClick={() => {
+                setSpecificDate('');
+                setMonthFilter('');
+              }}
               className="nav-btn"
               style={{ alignSelf: 'flex-end', height: '35px', padding: '0 1rem' }}
             >
-              Limpar Data
+              Limpar Datas
             </button>
           )}
         </div>
@@ -433,7 +465,7 @@ export default function ServiceList({ services, onRefresh }) {
             {currentServices.length === 0 ? (
               <tr>
                 <td colSpan="11" style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-secondary)' }}>
-                  {filterClient || filterPlate || filterDispatcher || dateFilter !== 'all' ? 'Nenhum serviço encontrado com os filtros atuais.' : 'Nenhum serviço cadastrado.'}
+                  {filterClient || filterPlate || filterDispatcher || dateFilter !== 'all' || monthFilter || specificDate ? 'Nenhum serviço encontrado com os filtros atuais.' : 'Nenhum serviço cadastrado.'}
                 </td>
               </tr>
             ) : (
