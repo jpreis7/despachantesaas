@@ -25,11 +25,46 @@ export default function ImportServices() {
         reader.onload = (e) => {
             try {
                 const data = new Uint8Array(e.target.result);
-                // Codepage 1252 helps with some ANSI encoded CSVs common in Brazil/Excel
                 const workbook = XLSX.read(data, { type: 'array', codepage: 1252 });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
-                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+                // 1. Read as array of arrays to find the header row
+                const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+                let headerRowIndex = 0;
+                let foundHeaders = false;
+
+                // Keywords to identify the header row
+                const expectedKeywords = ['data_entrada', 'data', 'placa', 'cliente', 'valor', 'tipo'];
+
+                for (let i = 0; i < Math.min(rawRows.length, 20); i++) {
+                    const row = rawRows[i];
+                    if (!row || !Array.isArray(row)) continue;
+
+                    // Check if this row contains at least one of our expected keywords
+                    const rowString = row.map(cell => String(cell).toLowerCase().trim()).join(' ');
+
+                    // We need a decent match confidence. 
+                    // If it contains "data_entrada" it's very likely.
+                    // If it contains "placa" AND "valor", likely.
+                    const hasDataEntrada = rowString.includes('data_entrada');
+                    const matchCount = expectedKeywords.filter(keyword => rowString.includes(keyword)).length;
+
+                    if (hasDataEntrada || matchCount >= 2) {
+                        headerRowIndex = i;
+                        foundHeaders = true;
+                        break;
+                    }
+                }
+
+                if (!foundHeaders) {
+                    console.warn('Could not auto-detect header row. Defaulting to 0.');
+                }
+
+                // 2. Parse again starting from the found header row
+                // range: index tells xlsx where to start
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { range: headerRowIndex });
 
                 if (jsonData.length === 0) {
                     setMessage({ type: 'error', text: 'Nenhum dado encontrado no arquivo.' });
@@ -37,14 +72,12 @@ export default function ImportServices() {
                     return;
                 }
 
-                // Check if semicolon separation failed (all keys in one string)
-                const firstKey = Object.keys(jsonData[0])[0];
-                if (Object.keys(jsonData[0]).length === 1 && firstKey.includes(';')) {
-                    setMessage({ type: 'warning', text: 'Detectado possível problema com separador (ponto e vírgula). Tentando processar, mas verifique a pré-visualização.' });
-                    // NOTE: Implementing manual CSV parsing here would be ideal if XLSX fails hard, 
-                    // but usually XLSX handles it if extension is .csv. 
-                    // If the user uploads a file where XLSX fails to split columns, we might need a different approach.
-                    // For now, let's proceed and see if preview reveals the issue to the user.
+                // Check for Semicolon issues
+                if (jsonData.length > 0) {
+                    const firstKey = Object.keys(jsonData[0])[0];
+                    if (Object.keys(jsonData[0]).length === 1 && firstKey.includes(';')) {
+                        setMessage({ type: 'warning', text: 'Possível erro de separador (ponto e vírgula). Verifique a pré-visualização.' });
+                    }
                 }
 
                 setPreviewData(jsonData);
@@ -104,10 +137,12 @@ export default function ImportServices() {
 
         // 1. Date (Data_Entrada > Data > Date)
         const dateRaw = getField(['data_entrada', 'data entrada']) || getField(['data', 'date']);
-        // Only use current date if NO date found. 
-        // If date found is invalid, we might want to default to today or keep null? 
-        // Logic: parseDate returns null if invalid/missing. || fallback.
-        const date = parseDate(dateRaw) || new Date().toISOString().split('T')[0];
+        // Use parsed date, or fallback to today ONLY if parse fails AND raw was empty
+        const parsedDate = parseDate(dateRaw);
+        // If row has NO date-like column, default to today. If it HAS one but invalid, maybe null?
+        // User wants: "Se o arquivo tiver Data_Entrada, use ela...". 
+        // Logic: Try to use what we found. Fallback to today.
+        const date = parsedDate || new Date().toISOString().split('T')[0];
 
         // 2. Completion Date (Data_Fim > Data Saida > Completion Date)
         const completionRaw = getField(['data_fim', 'data fim', 'data_saida', 'completion_date']);
