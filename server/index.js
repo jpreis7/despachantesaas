@@ -135,7 +135,8 @@ app.get('/api/services', async (req, res) => {
             .from('services')
             .select('*')
             .order('date', { ascending: false })
-            .order('id', { ascending: false });
+            .order('id', { ascending: false })
+            .range(0, 9999);
 
         if (error) {
             console.error('[GET /api/services] DB Error:', error);
