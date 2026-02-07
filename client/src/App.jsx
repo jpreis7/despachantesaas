@@ -3,6 +3,7 @@ import ServiceForm from './components/ServiceForm'
 import ServiceList from './components/ServiceList'
 import ClientManager from './components/ClientManager'
 import DispatcherManager from './components/DispatcherManager'
+import ImportServices from './components/ImportServices'
 
 import Login from './components/Login'
 import { supabase } from './supabaseClient'
@@ -11,7 +12,7 @@ import { authenticatedFetch } from './api'
 function App() {
   const [session, setSession] = useState(null)
   const [services, setServices] = useState([]);
-  const [view, setView] = useState('services'); // 'services', 'clients', 'dispatchers'
+  const [view, setView] = useState('services'); // 'services', 'clients', 'dispatchers', 'import'
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -84,6 +85,12 @@ function App() {
         >
           Despachantes
         </button>
+        <button
+          onClick={() => setView('import')}
+          className={`nav-btn ${view === 'import' ? 'active' : 'inactive'}`}
+        >
+          Importar Planilha
+        </button>
       </div>
 
       {view === 'services' ? (
@@ -93,8 +100,10 @@ function App() {
         </>
       ) : view === 'clients' ? (
         <ClientManager />
-      ) : (
+      ) : view === 'dispatchers' ? (
         <DispatcherManager />
+      ) : (
+        <ImportServices />
       )}
     </div>
   );
