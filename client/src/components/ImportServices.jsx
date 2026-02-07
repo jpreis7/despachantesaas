@@ -104,9 +104,30 @@ export default function ImportServices() {
             return foundKey ? row[foundKey] : null;
         };
 
+        const cleanCurrency = (value) => {
+            if (value === null || value === undefined || value === '') return 0;
+            if (typeof value === 'number') return value;
+
+            // Remove 'R$', spaces, and non-numeric chars except comma, dot and minus
+            let clean = String(value).replace(/[^\d.,-]/g, '').trim();
+
+            if (!clean) return 0;
+
+            // Handle Brazilian format (1.000,00 -> 1000.00)
+            // Strategy: If comma exists, and it's after the last dot (or no dot), assume it's the decimal separator
+            if (clean.includes(',')) {
+                // Replace all dots (thousands separators) with empty string
+                clean = clean.replace(/\./g, '');
+                // Replace comma with dot
+                clean = clean.replace(',', '.');
+            }
+
+            const floatVal = parseFloat(clean);
+            return isNaN(floatVal) ? 0 : floatVal;
+        };
+
         const parseDate = (raw) => {
             if (!raw) return null;
-            let dateStr = null;
 
             // Excel Serial Date
             if (typeof raw === 'number') {
@@ -116,6 +137,8 @@ export default function ImportServices() {
 
             if (typeof raw === 'string') {
                 const cleanRaw = raw.trim();
+                if (cleanRaw === '') return null;
+
                 // DD/MM/YYYY or DD-MM-YYYY
                 if (/^\d{1,2}[\/-]\d{1,2}[\/-]\d{4}/.test(cleanRaw)) {
                     const parts = cleanRaw.split(/[\/-]/);
@@ -127,17 +150,16 @@ export default function ImportServices() {
                     return cleanRaw.substring(0, 10);
                 }
             }
-            return dateStr;
+            return null; // Explicitly return null if no match or empty
         };
 
         // Priority Mapping
 
         // 1. Date (Data_Entrada > Data > Date)
         const dateRaw = getField(['data_entrada', 'data entrada']) || getField(['data', 'date']);
+
         // Use parsed date, or fallback to today ONLY if parse fails AND raw was empty
         const parsedDate = parseDate(dateRaw);
-        // If row has NO date-like column, default to today. If it HAS one but invalid, maybe null?
-        // User wants: "Se o arquivo tiver Data_Entrada, use ela...". 
         // Logic: Try to use what we found. Fallback to today.
         const date = parsedDate || new Date().toISOString().split('T')[0];
 
@@ -145,11 +167,15 @@ export default function ImportServices() {
         const completionRaw = getField(['data_fim', 'data fim', 'data_saida', 'completion_date']);
         const completionDate = parseDate(completionRaw);
 
+        // 3. Value
+        const valueRaw = getField(['valor', 'value', 'preço', 'price']);
+        const value = cleanCurrency(valueRaw);
+
         return {
             date: date,
             completion_date: completionDate, // Supabase handles null correctly
             type: getField(['tipo', 'type', 'serviço', 'service']) || 'Outros',
-            value: parseFloat(getField(['valor', 'value', 'preço', 'price'])) || 0,
+            value: value,
             plate: getField(['placa', 'plate']) || '',
             model: getField(['modelo', 'model', 'veículo', 'vehicle']) || '',
             owner: getField(['proprietário', 'owner', 'cliente final']) || '',
@@ -186,7 +212,7 @@ export default function ImportServices() {
 
         const formattedData = previewData.map(row => {
             const processed = processData(row);
-            // Explicitly attach user_id. This is the FIX.
+            // Explicitly attach user_id.
             return { ...processed, user_id: user.id };
         });
 
