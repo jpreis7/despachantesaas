@@ -103,7 +103,7 @@ function App() {
       ) : view === 'dispatchers' ? (
         <DispatcherManager />
       ) : (
-        <ImportServices />
+        <ImportServices onImportSuccess={fetchServices} />
       )}
     </div>
   );

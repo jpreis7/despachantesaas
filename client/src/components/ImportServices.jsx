@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import { supabase } from '../supabaseClient';
 import ConfirmationModal from './ConfirmationModal';
 
-export default function ImportServices() {
+export default function ImportServices({ onImportSuccess }) {
     const [file, setFile] = useState(null);
     const [previewData, setPreviewData] = useState([]);
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
@@ -259,8 +259,18 @@ export default function ImportServices() {
             setFile(null);
             setPreviewData([]);
             if (fileInputRef.current) fileInputRef.current.value = '';
+
+            // Trigger refresh
+            if (onImportSuccess) {
+                console.log('🔄 Atualizando lista de serviços...');
+                onImportSuccess();
+            }
         } else {
             setMessage({ type: 'warning', text: `Importação concluída. ${successCount} sucessos, ${errorCount} erros. Verifique o Console (F12).` });
+            // Try refresh anyway to show what succeeded
+            if (onImportSuccess) {
+                onImportSuccess();
+            }
         }
     };
 
