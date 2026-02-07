@@ -45,9 +45,6 @@ export default function ImportServices() {
                     // Check if this row contains at least one of our expected keywords
                     const rowString = row.map(cell => String(cell).toLowerCase().trim()).join(' ');
 
-                    // We need a decent match confidence. 
-                    // If it contains "data_entrada" it's very likely.
-                    // If it contains "placa" AND "valor", likely.
                     const hasDataEntrada = rowString.includes('data_entrada');
                     const matchCount = expectedKeywords.filter(keyword => rowString.includes(keyword)).length;
 
@@ -166,27 +163,57 @@ export default function ImportServices() {
         setUploading(true);
         setMessage(null);
 
+        console.group('DEBUG: Início da Importação');
+
+        // 1. Get Current User Explicitly
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+            console.error('CRITICAL: Erro ao obter usuário:', userError);
+            setMessage({ type: 'error', text: 'Erro de autenticação: Usuário não encontrado na sessão.' });
+            setUploading(false);
+            console.groupEnd();
+            return;
+        }
+
+        console.log('✅ Usuário Identificado:', user.id, user.email);
+
         let successCount = 0;
         let errorCount = 0;
         const total = previewData.length;
 
         setProgress({ current: 0, total, success: 0, errors: 0 });
 
-        const formattedData = previewData.map(processData);
+        const formattedData = previewData.map(row => {
+            const processed = processData(row);
+            // Explicitly attach user_id. This is the FIX.
+            return { ...processed, user_id: user.id };
+        });
+
+        console.log('📦 Payload (Amostra do 1º item):', formattedData[0]);
 
         // Chunking
         const chunkSize = 50;
         for (let i = 0; i < formattedData.length; i += chunkSize) {
             const chunk = formattedData.slice(i, i + chunkSize);
+            console.log(`📤 Enviando batch ${(i / chunkSize) + 1}... Tamanho: ${chunk.length}`);
 
-            const { error } = await supabase
+            const { data, error } = await supabase
                 .from('services')
-                .insert(chunk);
+                .insert(chunk)
+                .select(); // Validate return
 
             if (error) {
-                console.error('Error importing batch:', error);
+                console.error('❌ Erro no insert:', error);
                 errorCount += chunk.length;
             } else {
+                // If RLS allows read, 'data' will contain inserted rows. 
+                // If RLS allows insert but denies read, 'data' might be empty but no error.
+                if (data && data.length > 0) {
+                    console.log('✅ Sucesso! Registros inseridos e retornados:', data.length);
+                } else {
+                    console.warn('⚠️ Sucesso no comando, mas nenhum dado retornado. Verifique Políticas RLS (Select Policy).');
+                }
                 successCount += chunk.length;
             }
 
@@ -198,14 +225,16 @@ export default function ImportServices() {
             }));
         }
 
+        console.groupEnd();
         setUploading(false);
+
         if (errorCount === 0) {
             setMessage({ type: 'success', text: `${successCount} serviços importados com sucesso!` });
             setFile(null);
             setPreviewData([]);
             if (fileInputRef.current) fileInputRef.current.value = '';
         } else {
-            setMessage({ type: 'warning', text: `Importação concluída. ${successCount} sucessos, ${errorCount} erros.` });
+            setMessage({ type: 'warning', text: `Importação concluída. ${successCount} sucessos, ${errorCount} erros. Verifique o Console (F12).` });
         }
     };
 
